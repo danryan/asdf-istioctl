@@ -4,9 +4,10 @@ set \
   -o pipefail \
   -o errexit
 
-# # Fetch all tag names, and get only second column. Then remove all unnecesary characters.
+# Fetch all tag names, and get only second column. Then remove all unnecesary characters.
+# v0.1.0 explicitly removed because it is a special case.
 list_all() {
-  local versions=$(eval $(get_command) | grep -oE "tag_name\": \".{1,15}\"," | sed 's/tag_name\": \"//;s/v//;s/\",//' | sort_versions)
+  local versions=$(eval $(get_command) | grep -oE "tag_name\": \".{1,15}\"," | sed 's/tag_name\": \"//;s/v//;s/\",//' | grep -v "0.1.0" | sort_versions)
   echo $versions
 }
 
@@ -28,6 +29,5 @@ get_command() {
 get_releases_url() {
   echo "https://api.github.com/repos/istio/istio/releases"
 }
-
 
 list_all
