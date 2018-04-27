@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
 set \
+-x \
   -o nounset \
   -o pipefail \
-  -o errexit
 
 # required environment variables
 : ${ASDF_INSTALL_TYPE?}
@@ -11,10 +11,9 @@ set \
 : ${ASDF_INSTALL_PATH?}
 
 readonly __dirname="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly toolname="$(basename "$(dirname "${__dirname}")")"
 
 # make a temporary download directory with a cleanup hook
-readonly TMP_DOWNLOAD_DIR="$(mktemp -d -t "asdf_${toolname}_XXXXXX")"
+readonly TMP_DOWNLOAD_DIR="$(mktemp -d -t "asdf_istioctl_XXXXXX")"
 trap 'rm -rf "${TMP_DOWNLOAD_DIR?}"' EXIT
 
 install() {
@@ -27,30 +26,40 @@ install() {
   local download_url="$(get_download_url "${version}")"
   local download_path="${TMP_DOWNLOAD_DIR}/$(get_filename "${version}")"
 
+  local source_path="${TMP_DOWNLOAD_DIR}/istioctl"
+
   if curl -fs -L "${download_url}" -o "${download_path}"; then
-    local source_path="${TMP_DOWNLOAD_DIR}/${toolname}"
 
-    echo "Extracting ${toolname} archive"
+    echo "Extracting istioctl archive"
     mkdir -p "${source_path}"
-    tar zxf "${download_path}" -C "${source_path}" --strip-components=1 || exit 1
 
-    echo "Cleaning ${toolname} previous binaries"
+    echo "Cleaning istioctl previous binaries"
     rm -rf "${bin_install_path?}"
 
-    echo "Creating ${toolname} bin directory"
+    echo "Creating istioctl bin directory"
     mkdir -p "${bin_install_path}"
 
-    local f
-    for f in "${source_path}"/bin/*; do
-      if [[ -f "${f}" ]] && [[ -x "${f}" ]]; then
-        cp "${f}" "${bin_install_path}"
-      fi
-    done
+    #  version 0.3.0 and above started packaging the tarballs differently
+    local bin_source_path
 
-  else
-    echo "Error: ${toolname} version ${version} not found" >&2
+    if lt_version_0_3_0 "${version}"; then
+      local bin_source_path="${source_path}/istio-${version}/bin"
+    else 
+      local bin_source_path="${source_path}/bin"
+    fi
+
+    tar zxf "${download_path}" -C "${source_path}" --strip-components=1 || exit 1
+    local binary_path="${bin_source_path}/istioctl"
+
+    if [[ -f "${binary_path}" ]] && [[ -x "${binary_path}" ]]; then
+      cp "${binary_path}" "${bin_install_path}"
+    fi
+  else 
+    echo "Error: istioctl version ${version} not found" >&2
     exit 1
   fi
+
+  sleep 300
 }
 
 get_platform() {
@@ -89,6 +98,18 @@ get_download_url() {
   local filename="$(get_filename $version)"
 
   echo "https://github.com/istio/istio/releases/download/${version}/${filename}"
+}
+
+lt_version_0_3_0() {
+  local version="${1//./ }"
+
+  local minor=$(echo "${version}" | awk '{print $2}')
+
+  if [[ "${minor}" -lt 3 ]]; then
+    return 0
+  fi
+
+  return 1
 }
 
 install $ASDF_INSTALL_TYPE $ASDF_INSTALL_VERSION $ASDF_INSTALL_PATH
