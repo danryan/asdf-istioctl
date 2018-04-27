@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 set \
--x \
   -o nounset \
   -o pipefail \
 
@@ -58,8 +57,6 @@ install() {
     echo "Error: istioctl version ${version} not found" >&2
     exit 1
   fi
-
-  sleep 300
 }
 
 get_platform() {
